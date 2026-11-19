@@ -1,0 +1,62 @@
+name: Daily FrontLines videos
+
+on:
+  schedule:
+    - cron: "0 8 * * *"   # 16:00 Malaysia time
+  workflow_dispatch:
+    inputs:
+      battle:
+        description: "battle id to render now (test, does not mark as done)"
+        required: false
+        default: ""
+      skip_long:
+        description: "1 = skip the long video (fast test)"
+        required: false
+        default: "0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily
+  cancel-in-progress: false
+
+jobs:
+  make:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools, fonts and map data
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg > /dev/null
+          pip install -q pillow numpy
+          mkdir -p fonts data
+          G=https://raw.githubusercontent.com/google/fonts/main/ofl
+          curl -sSfL -o fonts/Poppins-Bold.ttf   $G/poppins/Poppins-Bold.ttf
+          curl -sSfL -o fonts/Poppins-Medium.ttf $G/poppins/Poppins-Medium.ttf
+          curl -sSfL -o fonts/Lora-Variable.ttf  "$G/lora/Lora%5Bwght%5D.ttf"
+          for Y in $(python3 -c "import json,glob;print(' '.join(sorted({str(json.load(open(f)).get('basemap_year',1938)) for f in glob.glob('battles/*.json')})))"); do
+            curl -sSfL -o data/world_$Y.geojson https://raw.githubusercontent.com/aourednik/historical-basemaps/master/geojson/world_$Y.geojson
+          done
+      - name: Render
+        env:
+          BATTLE: ${{ github.event.inputs.battle }}
+          SKIP_LONG: ${{ github.event.inputs.skip_long }}
+        run: python3 make.py
+      - name: Save progress
+        if: github.event.inputs.battle == ''
+        run: |
+          git config user.name frontlines-bot
+          git config user.email frontlines-bot@users.noreply.github.com
+          git add done.json
+          git commit -qm "made $(python3 -c "import json;print(json.load(open('out/meta.json'))['battle'])")" || true
+          git push -q
+      - name: Put the videos on the 'out' branch
+        run: |
+          cd out
+          git init -q -b out
+          git add .
+          git -c user.name=frontlines-bot -c user.email=frontlines-bot@users.noreply.github.com commit -qm "out $(date -u +%F-%H%M)"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" out
