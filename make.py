@@ -11,13 +11,18 @@ if not bid:
 bf = os.path.join(HERE, "battles", bid + ".json")
 B = json.load(open(bf))
 os.makedirs("out", exist_ok=True)
-R = [sys.executable, os.path.join(HERE, "render.py"), bf]
-subprocess.run(R + ["out/thumb.png", "--thumb", "out/thumb.png"], check=True)
-subprocess.run(R + ["out/short_a.mp4", "--short"], check=True)
+def R(kind):
+    """renderer command; a battle may give its own map frame per format (long_bbox / short_bbox)"""
+    b = dict(B, bbox=B.get(kind + "_bbox") or B["bbox"])
+    f = os.path.join(HERE, "battles", f".{bid}.{kind}.json")
+    json.dump(b, open(f, "w"))
+    return [sys.executable, os.path.join(HERE, "render.py"), f]
+subprocess.run(R("long") + ["out/thumb.png", "--thumb", "out/thumb.png"], check=True)
+subprocess.run(R("short") + ["out/short_a.mp4", "--short"], check=True)
 part = "b" if (B.get("parts") or {}).get("b") else ""
-subprocess.run(R + ["out/short_b.mp4", "--short"] + (["--part", "b"] if part else []), check=True)
+subprocess.run(R("short") + ["out/short_b.mp4", "--short"] + (["--part", "b"] if part else []), check=True)
 if os.environ.get("SKIP_LONG") != "1":
-    subprocess.run(R + ["out/long.mp4"], check=True)
+    subprocess.run(R("long") + ["out/long.mp4"], check=True)
 y = B["yt"]
 credit = ("\n\nMap: FrontLines Maps. Borders: historical-basemaps by A. Ourednik (GPL-3.0). "
           "Front lines are approximate and drawn from dated control of towns. Music: original, FrontLines Maps.")
