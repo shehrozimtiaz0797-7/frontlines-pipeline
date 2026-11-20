@@ -1,8 +1,8 @@
 name: Daily FrontLines videos
 
 on:
-  schedule:
-    - cron: "30 9 * * *"   # 17:30 Malaysia time (after the 16:50 upload retry that uses the fresh YouTube quota)
+  # Started every day at about 17:00 MY by the "FrontLines Maps uploads" task (after its 16:50 retry).
+  # GitHub's own schedule did not fire on 20 Nov, so there is no cron here.
   workflow_dispatch:
     inputs:
       battle:
